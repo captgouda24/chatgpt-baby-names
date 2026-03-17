@@ -1,0 +1,24 @@
+{
+  "model": "openai/gpt-3.5-turbo",
+  "model_description": "GPT-3.5-turbo - the model that powered ChatGPT at launch",
+  "chatgpt_launch_date": "2022-11-30",
+  "model_training_cutoff": "2021-09",
+  "notes": [
+    "GPT-3.5-turbo is the same model architecture used in ChatGPT when it launched Nov 30, 2022",
+    "This model's recommendations represent what users would have received from ChatGPT in late 2022 through early 2023",
+    "The model was trained on data up to September 2021, so its name recommendations reflect pre-2022 popularity patterns",
+    "Treatment period for diff-in-diff: 2023+ (first full year after ChatGPT launch)"
+  ],
+  "query_parameters": {
+    "temperature": 0.8,
+    "max_tokens": 500,
+    "api_provider": "OpenRouter"
+  },
+  "identification_strategy": {
+    "treatment": "Names recommended by ChatGPT (frequency > 0)",
+    "control": "Names not recommended by ChatGPT",
+    "pre_period": "2015-2022 (before ChatGPT influence)",
+    "post_period": "2023-2024 (after ChatGPT available)",
+    "first_stage_variation": "chatgpt_freq - how many times the model recommended each name across queries"
+  }
+}
