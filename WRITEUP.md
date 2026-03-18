@@ -2,127 +2,164 @@
 
 ## Research Question
 
-Did ChatGPT influence baby naming trends after its November 2022 launch? We test whether names that ChatGPT recommends grew disproportionately in 2023-2024 compared to names it does not recommend.
+Did ChatGPT influence baby naming trends after its November 2022 launch? We test whether names that ChatGPT recommends grew disproportionately in 2024 compared to names it does not recommend, after controlling for pre-existing trends.
 
 ## Data
 
 ### ChatGPT Name Recommendations
 
-We queried OpenAI language models via the OpenRouter API to collect baby name recommendations. We used two models:
+We queried OpenAI language models via the OpenRouter API to collect baby name recommendations. We used three models:
 
-- **GPT-3.5-turbo**: The model powering ChatGPT at launch (November 30, 2022). 1,212 queries yielding 604 unique recommended names.
-- **GPT-4**: Released March 2023. 148 queries yielding 1,119 unique recommended names.
+| Model | Queries | Unique Names | Total Mentions |
+|-------|---------|--------------|----------------|
+| GPT-3.5-turbo | 1,440 | 604 | 15,767 |
+| GPT-4 | 190 | 1,119 | 5,820 |
+| GPT-4-turbo | 420 | 1,093 | 10,451 |
+| **Combined** | **2,050** | **1,874** | **32,038** |
 
 Each query used one of 24 prompts designed to mimic how users ask for baby name suggestions (e.g., "Suggest 10 baby names for a boy", "What are some unique baby names?", "What baby names are trending?"). We ran each prompt multiple times with temperature=0.8 to capture variation in recommendations.
 
-For each name, we recorded how many times it was recommended across all queries (`chatgpt_freq`).
+### Model Agreement
+
+The three models show moderate overlap in which names they recommend:
+
+| Comparison | Shared Names | Jaccard Similarity |
+|------------|--------------|-------------------|
+| GPT-3.5 vs GPT-4 | 408 | 31% |
+| GPT-3.5 vs GPT-4-turbo | 342 | 25% |
+| GPT-4 vs GPT-4-turbo | 490 | 29% |
+
+However, among names recommended by multiple models, the frequency correlation is high (r = 0.82-0.84), suggesting models agree on *how often* to recommend shared names even if they differ on which names to include.
+
+298 names appear in all three models; 1,874 unique names appear in at least one.
 
 ### SSA Baby Name Data
 
 We obtained baby name counts from the Social Security Administration:
 - **National data**: 322,468 name-year observations covering 52,958 unique names from 2015-2024
-- **State-level data**: 949,353 observations across 51 states (used for robustness checks)
 
 Names with fewer than 5 occurrences per year are excluded by SSA for privacy.
 
 ## Empirical Strategy
 
-### Difference-in-Differences Design
+### The Identification Problem
 
-We estimate the effect of ChatGPT recommendations on baby name popularity using a difference-in-differences framework:
+A naive comparison of ChatGPT-recommended names vs. non-recommended names is confounded by selection: ChatGPT tends to recommend names that are already popular or trending. If recommended names grew faster in 2024, this could reflect either:
 
-- **Treatment group**: Names that ChatGPT recommends
-- **Control group**: Names that ChatGPT does not recommend
-- **Pre-period**: 2015-2022 (before ChatGPT)
-- **Post-period**: 2024 (babies conceived after ChatGPT launched)
+1. **Causal effect**: ChatGPT influenced parents' naming decisions
+2. **Selection**: ChatGPT recommends names that were already on upward trajectories
 
-We focus on 2024 rather than 2023 because babies born in 2023 were largely conceived before ChatGPT's launch in late November 2022.
+### Excess Recommendation
+
+To address selection on *levels*, we construct an "excess recommendation" measure. Among names that ChatGPT recommends, we regress log(recommendation frequency) on log(pre-period popularity):
+
+```
+log(chatgpt_freq) = 0.055 + 0.320 × log(pre_popularity)
+```
+
+The residual from this regression captures names that ChatGPT recommends *more than expected* given their baseline popularity. A name with high excess recommendation is one that ChatGPT favors disproportionately—the "ChatGPT discovery" effect.
+
+### Controlling for Pre-Trends
+
+To address selection on *trends*, we compute each name's linear growth rate over 2015-2022 (pre-ChatGPT) and include it as a control. This asks: among names with similar pre-existing trajectories, did the ones ChatGPT favors grow faster in 2024?
+
+Importantly, excess recommendation is nearly uncorrelated with pre-trend (r = 0.025), suggesting these capture different dimensions of selection.
 
 ### Specification
 
-Our main specification includes name and year fixed effects:
+Our main specification:
 
 ```
-log(count_it) = α_i + γ_t + β × (Treatment_i × Post_t) + ε_it
+log(count_it) = α_i + γ_t + β₁(ExcessRec_i × Post_t) + β₂(PreTrend_i × Post_t) + ε_it
 ```
 
 Where:
-- `α_i` = name fixed effects (absorbs time-invariant name characteristics)
-- `γ_t` = year fixed effects (absorbs aggregate trends)
-- `Treatment_i` = measure of ChatGPT recommendation intensity
-- `Post_t` = indicator for year 2024
-- `β` = **coefficient of interest** (differential growth for ChatGPT-recommended names)
+- `α_i` = name fixed effects
+- `γ_t` = year fixed effects
+- `ExcessRec_i` = standardized excess recommendation (0 for non-recommended names)
+- `PreTrend_i` = standardized pre-period growth rate (2015-2022)
+- `Post_t` = indicator for 2024
+- `β₁` = **coefficient of interest**
 
-Standard errors are clustered by name to account for serial correlation within names.
-
-### Treatment Measures
-
-We consider several treatment definitions:
-
-1. **Simple Pool**: Raw frequency of recommendations summed across GPT-3.5 and GPT-4, converted to "excess recommendation" (residualized on pre-period popularity)
-
-2. **Equal Model Weight**: Normalize frequencies within each model before averaging, then compute excess recommendation
-
-3. **GPT-3.5 Only**: Use only the original ChatGPT model's recommendations
-
-4. **Union (Binary)**: Treatment = 1 if any model recommends the name, 0 otherwise
-
-The "excess recommendation" approach regresses log(chatgpt_freq) on log(pre-period popularity) among recommended names, then uses the residual as treatment intensity. This isolates names that ChatGPT recommends *disproportionately* to their baseline popularity—the "ChatGPT discovery" effect.
+Standard errors are clustered by name.
 
 ## Results
 
+### Pre-Trend Analysis
+
+We first examine whether ChatGPT-recommended names (binary) were on differential trends before ChatGPT existed:
+
+| Year | Coefficient | t-stat | |
+|------|-------------|--------|---|
+| 2015 | -14.4% | -7.41 | *** |
+| 2016 | -11.1% | -5.86 | *** |
+| 2017 | -7.3% | -4.28 | *** |
+| 2018 | +0.6% | 0.38 | |
+| 2019 | +2.3% | 1.44 | |
+| 2020 | +1.4% | 0.82 | |
+| 2021 | +6.9% | 4.60 | *** |
+| 2022 | (ref) | — | |
+| 2023 | +5.6% | 3.20 | *** |
+| 2024 | +9.1% | 5.54 | *** |
+
+ChatGPT-recommended names were on a clear upward trajectory *before* ChatGPT launched, rising from -14% (2015) to +7% (2021) relative to 2022. This invalidates naive binary DiD estimates.
+
 ### Main Results
 
-| Specification | N Treated | Coefficient | SE | t-stat | p-value |
-|---------------|-----------|-------------|------|--------|---------|
-| Simple Pool (excess) | 1,152 | 0.037 | 0.019 | 1.97 | 0.049** |
-| Equal Model Weight (excess) | 1,152 | 0.009 | 0.022 | 0.39 | 0.694 |
-| GPT-3.5 Only (excess) | 565 | 0.029 | 0.028 | 1.03 | 0.305 |
-| Union (Binary) | 1,161 | 0.089 | 0.019 | 4.78 | <0.001*** |
+| Specification | Coefficient | SE | t-stat | p-value |
+|---------------|-------------|------|--------|---------|
+| Excess recommendation (no controls) | +2.54% | 0.017 | 1.53 | 0.126 |
+| Excess recommendation (controlling for pre-trend) | +2.25% | 0.017 | 1.36 | 0.175 |
+| Pre-trend | +16.32% | 0.004 | 43.01 | <0.001 |
 
-\* p<0.10, \*\* p<0.05, \*\*\* p<0.01
+Interpretation:
+- **Pre-trend** is massively predictive of 2024 outcomes. Names that were growing before ChatGPT continued growing after.
+- **Excess recommendation** shows a positive but statistically insignificant effect. A 1 SD increase in excess ChatGPT recommendation is associated with ~2.3% higher baby counts in 2024, but we cannot distinguish this from noise (p = 0.175).
 
-### Interpretation
+### Binary Treatment (For Comparison)
 
-**Simple Pool**: A one standard deviation increase in excess ChatGPT recommendation is associated with 3.7% higher name counts in 2024 relative to the pre-period (p=0.049). This effect is marginally significant at the 5% level.
+| Specification | Coefficient | SE | t-stat | p-value |
+|---------------|-------------|------|--------|---------|
+| Binary (recommended by any model) | +9.1% | 0.016 | 5.54 | <0.001 |
 
-**Binary Treatment**: Names that ChatGPT recommends (from either model) grew 8.9% more in 2024 than names it does not recommend (p<0.001). This effect is highly significant.
+The binary effect is highly significant but confounded by pre-trends. ChatGPT-recommended names grew 9% more in 2024, but they were already growing faster before ChatGPT existed.
 
-The binary result is substantially larger than the continuous specifications. This could reflect:
-1. An extensive margin effect (being recommended at all matters more than recommendation intensity)
-2. Selection: ChatGPT recommends names that were already on upward trajectories
-3. The continuous "excess" specification may over-control by removing correlation with baseline popularity
+## Interpretation
 
-### Robustness Checks
+We find **no statistically significant evidence** that ChatGPT influenced baby naming after accounting for pre-existing trends.
 
-**Pre-trend analysis**: We examined whether ChatGPT-recommended names were on differential trends before 2022. Event study plots show some year-to-year variation but no clear pre-trend, though 2019 shows an anomalous spike for some specifications.
+The point estimate is positive (+2.3% per SD of excess recommendation) and economically meaningful, but the standard error is too large to reject the null hypothesis of no effect. This could reflect:
 
-**State-level heterogeneity**: We tested whether effects are larger in "tech hub" states (CA, WA, MA, NY, CO, TX) where ChatGPT adoption may have been higher. The triple-difference estimate (ChatGPT × Post × Tech State) was small and insignificant (0.5%, t=0.27), suggesting the effect—if real—is geographically uniform.
+1. **True null**: ChatGPT did not meaningfully influence baby naming
+2. **Underpowered**: The effect exists but is too small to detect with our sample
+3. **Measurement error**: Our proxy for "ChatGPT recommendation" is noisy
 
-**Matching on pre-trends**: When we match treated names to control names with similar pre-2022 trajectories, the binary DiD estimate falls from 11% to 2.3% and becomes insignificant. This suggests some of the effect may reflect pre-existing differences between ChatGPT-recommended names and others.
+The highly significant binary result (+9.1%) is misleading—it reflects ChatGPT's tendency to recommend already-trending names rather than a causal effect on naming.
 
 ## Limitations
 
-1. **Selection bias**: ChatGPT recommends names that are already popular or "on trend." While we control for name fixed effects, we cannot rule out that recommended names were on different trajectories.
+1. **Selection on unobservables**: We control for linear pre-trends, but names may differ on higher-order dynamics (acceleration, seasonality) that correlate with both ChatGPT recommendation and future growth.
 
-2. **Multiple specifications**: We report four treatment definitions. At the 5% level, we would expect roughly one false positive by chance. The binary result (t=4.78) is robust, but the continuous results are sensitive to specification.
+2. **Measurement of treatment**: We observe what ChatGPT recommends *today*, not what it recommended in 2023 when parents were choosing names. Model behavior may have drifted.
 
-3. **Mechanism**: We cannot distinguish whether effects operate through ChatGPT directly influencing parents, or ChatGPT reflecting broader cultural trends that independently affect naming.
+3. **Mechanism**: Even if we found an effect, we could not distinguish direct influence (parents asking ChatGPT) from indirect influence (ChatGPT reflecting cultural trends that independently affect naming).
 
-4. **Power**: Despite 322K observations, clustering by name reduces effective sample size. We may be underpowered to detect small effects in continuous specifications.
+4. **External validity**: We query ChatGPT in English with US-centric prompts. Effects may differ for non-English names or other countries.
 
 ## Conclusion
 
-We find suggestive evidence that ChatGPT-recommended names grew faster in 2024 than non-recommended names. The binary treatment effect (8.9%, p<0.001) is large and significant, while continuous "excess recommendation" specifications show smaller effects that are marginally significant or insignificant depending on specification.
+Despite ChatGPT's widespread adoption, we find no statistically significant evidence that it influenced baby naming trends in 2024. ChatGPT-recommended names did grow faster than non-recommended names, but this appears to reflect selection—ChatGPT recommends names that were already on upward trajectories—rather than a causal effect of the technology.
 
-These results are consistent with ChatGPT influencing baby naming, but we cannot rule out that ChatGPT simply recommends names that were already trending upward for other reasons. The null result in tech vs. non-tech states is inconsistent with a pure ChatGPT adoption story, as we would expect larger effects where ChatGPT usage was higher.
+The null result is informative: it suggests that either (1) few parents actually use ChatGPT for baby naming, (2) ChatGPT's recommendations are too generic to shift aggregate trends, or (3) parents who consult ChatGPT would have chosen similar names anyway.
 
-## Data and Code Availability
+## Data and Code
 
-All code and processed data are available in the project repository:
-- `scripts/query_openrouter.py` - Query ChatGPT models
-- `scripts/download_ssa.py` - Process SSA data
+**ChatGPT queries**: Collected via OpenRouter API (openrouter.ai)
+- `scripts/query_openrouter.py` - Query script
+
+**SSA data**: https://www.ssa.gov/oact/babynames/names.zip
+- `scripts/download_ssa.py` - Processing script
+
+**Analysis**:
 - `scripts/combine_and_analyze.py` - Main analysis
 - `data/processed/` - Cleaned datasets
-
-Raw SSA data: https://www.ssa.gov/oact/babynames/names.zip

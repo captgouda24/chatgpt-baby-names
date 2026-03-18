@@ -1,5 +1,9 @@
-# Large zip files
+# Large data files
 data/raw/*.zip
+data/raw/*.jsonl
+data/processed/*.csv
+data/*.csv
+data/*.dta
 
 # Python
 __pycache__/
