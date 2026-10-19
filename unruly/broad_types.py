@@ -39,6 +39,10 @@ inc = s.kind.isin(["incident_violent", "incident_nonviolent"])
 s["ev"] = s.month.astype(str) + "_" + s.event.astype(str)
 ev_kind = s[inc].groupby("ev").kind.agg(lambda k: "incident_violent" if (k == "incident_violent").any() else "incident_nonviolent")
 s.loc[inc, "kind_ev"] = s.loc[inc, "ev"].map(ev_kind)
+# Haiku marks "?" when a headline doesn't name the airline; resolve at event level:
+# any headline saying US -> US, else any saying foreign -> foreign, else unsure
+ev_us = s[inc].groupby("ev").us.agg(lambda u: "1" if (u == "1").any() else ("0" if (u == "0").any() else "?"))
+s.loc[inc, "us"] = s.loc[inc, "ev"].map(ev_us)
 
 
 def counts(sub):

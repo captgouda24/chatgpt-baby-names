@@ -56,6 +56,8 @@ src, out = sys.argv[1], sys.argv[2]
 rows, den = [], []
 for f in sorted(glob.glob(os.path.join(src, "*.tsv"))):
     tag = os.path.basename(f)[:6]
+    if not os.path.exists(f[:-4] + ".n"):  # month still being pulled
+        continue
     files, arts, _ = open(f[:-4] + ".n").read().split()
     den.append(dict(month=tag, gkg_files=int(files), gkg_titled_articles=int(arts)))
     for line in open(f, encoding="utf8"):
