@@ -4,7 +4,8 @@ Usage: python gkg_titles.py OUTDIR START_YYYYMM END_YYYYMM [THREADS]
 Reads the :00 file of every hour (a 1-in-4 sample of GKG's 15-minute files), keeps
 articles whose page title matches TITLE, and writes per month:
   OUTDIR/YYYYMM.tsv   file_ts, domain, url, title for matches
-  OUTDIR/YYYYMM.n     files read, total articles seen (denominator)
+  OUTDIR/YYYYMM.n     files read, articles with a page title (denominator), failed files
+GKG carries <PAGE_TITLE> only from about October 2019, so start there.
 Months already written are skipped.
 """
 import concurrent.futures as cf, io, os, re, sys, urllib.request, zipfile
@@ -34,9 +35,11 @@ def fetch(ts):
         f = line.split("\t")
         if len(f) < 27:
             continue
-        n += 1
         m = PT.search(f[26])
-        if m and TITLE.search(m.group(1)):
+        if not m:  # PAGE_TITLE only exists from about Oct 2019
+            continue
+        n += 1
+        if TITLE.search(m.group(1)):
             hits.append((ts, f[3], f[4], " ".join(m.group(1).split())))
     return ts, n, hits
 
