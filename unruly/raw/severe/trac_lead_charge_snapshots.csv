@@ -1,0 +1,18 @@
+statute,wayback_timestamp,latest_month,fy_label,prosecutions_fy,convictions_fy,note
+46504,20111224212246,2011-09,2011,20,19,complete FY
+46504,20130327131313,2013-01,2012,20,17,FY label = prior completed FY
+46504,20150415030352,2015-02,2014,22,16,FY label = prior completed FY
+46504,20180212230216,2017-12,2017,19,18,FY label = prior completed FY
+46504,20191113005315,2019-09,2019,28,24,complete FY
+46504,20210217073358,2020-12,2020,18,11,FY label = prior completed FY (Oct-2020 snapshot showed 19/11)
+46504,20211122032349,2021-09,2021,28,14,complete FY
+46504,20230315105716,2023-01,2022,23,15,FY label = prior completed FY (Aug-2022 snapshot showed 25/16)
+46504,20250310165433,2024-10,2024,24,19,FY label = prior completed FY (Mar-2024 snapshot showed 34/18)
+46504,20251118213949,2025-07,2025,48,12,PARTIAL/anomalous: same figure since Mar-2025 snapshot
+46506,20180212230226,2017-12,2017,6,5,FY label = prior completed FY
+46506,20201029084319,2020-10?,2020,5,3,
+46506,20211122032354,2021-09,2021,4,,complete FY; convictions not shown
+46506,20230203143604,2022-11,2022,11,4,FY label = prior completed FY
+46506,20240303232936,2023-12,2023,10,9,FY label = prior completed FY
+46506,20250324154019,2025-01,2024,8,8,FY label = prior completed FY
+46506,20260421034228,2025-10,2025,8,6,FY label = prior completed FY (mid-2025 snapshots showed 12)

@@ -1,0 +1,7 @@
+b0,scenario,b_t,max_rate_multiplier
+0.12,"2021 trough (biz 30%, leisure 80% of 2019)",0.049,1.08
+0.12,"2023+ (biz 80%, leisure 105%)",0.094,1.03
+0.3,"2021 trough (biz 30%, leisure 80% of 2019)",0.138,1.23
+0.3,"2023+ (biz 80%, leisure 105%)",0.246,1.08
+0.4,"2021 trough (biz 30%, leisure 80% of 2019)",0.2,1.33
+0.4,"2023+ (biz 80%, leisure 105%)",0.337,1.11
