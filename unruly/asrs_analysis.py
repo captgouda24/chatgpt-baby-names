@@ -40,6 +40,8 @@ d.to_csv(os.path.join(HERE, "asrs_coded.csv"), index=False)
 def wilson(k, n, z=1.96):
     if n == 0:
         return np.nan, np.nan
+    if k == 0:
+        return 0.0, 1 - (0.025) ** (1 / n)  # exact upper bound when nothing is observed
     p = k / n
     c = (p + z * z / (2 * n)) / (1 + z * z / n)
     h = z * np.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / (1 + z * z / n)
@@ -76,10 +78,12 @@ ax[0].legend(frameon=False)
 for scope, col, off in [("all reports", "#c2453d", -0.12), ("excluding mask reports", "0.3", 0.12)]:
     s = t[(t.scope == scope) & t.period.str.fullmatch(r"\d{4}")].copy()
     s["y"] = s.period.astype(int)
-    ax[1].errorbar(s.y + off, s.violent_share * 100, yerr=[(s.violent_share - s.lo) * 100, (s.hi - s.violent_share) * 100],
+    ax[1].errorbar(s.y + off, s.violent_share * 100, yerr=[(s.violent_share - s.lo).clip(lower=0) * 100, (s.hi - s.violent_share).clip(lower=0) * 100],
                    fmt="o", color=col, capsize=3, label=f"Violent share, {scope} (95% CI)")
 ax[1].set_ylabel("% of reports describing violence")
 ax[1].set_ylim(0, 100)
+ax[1].axvspan(2021.5, 2026.5, color="0.93", zorder=0)
+ax[1].text(2021.7, 92, "after 2021 ASRS 'passenger misconduct' reports are mostly\nbatteries, dangerous goods and cabin heat, not behaviour", fontsize=8, color="0.35", va="top")
 ax[1].legend(frameon=False, fontsize=8, loc="upper left")
 for a_ in ax:
     a_.spines[["top", "right"]].set_visible(False)

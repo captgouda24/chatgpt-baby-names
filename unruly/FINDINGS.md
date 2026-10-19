@@ -183,3 +183,25 @@ Reproduce:
 4. `python broad_types.py raw/haiku_labels/broad raw/haiku_labels/broad_policy_split raw/haiku_labels/broad_violent_verify`
 
 The narrow-filter version: `python gkg_headline_types.py raw/haiku_labels/gkg`. The 2018–20 DOC-API sample: `python headline_types.py raw/haiku_labels/api`.
+
+## NASA ASRS crew reports: does the FAA series hide a change in how violent incidents are?
+
+The FAA publishes only totals (reports, investigations, enforcement actions, fines). It does not separate violent from non-violent incidents; the only breakdown it ever gave was "mask-related" in 2021–22. So I pulled NASA's Aviation Safety Reporting System (ASRS), where crews file voluntary narrative reports. The export covers every report coded *Anomaly: Flight Deck / Cabin / Aircraft Event: Passenger Misconduct*, Jan 2015–Jun 2026: 570 reports, 554 of them from airline crews (`raw/asrs/`).
+
+Haiku read each full narrative and coded it with the same violence definition used for the news analysis (rubric `raw/asrs/rubric_asrs.md`): physical force, restraint, door or cockpit attempts, sexual contact, threats. It also coded restraint, threats, crew assault, masks, alcohol, diversion and police involvement. In the 2015–19 reports, 41 of the 44 coded violent contain an assault- or restraint-type word, and a spot-check of 20 synopses found the codes sensible. Outputs: `asrs_coded.csv`, `asrs_by_period.csv`, `asrs.png`.
+
+| | 2015–19 | 2020 | 2021 | 2022–23 | 2024–26 |
+|---|---|---|---|---|---|
+| Reports | 191 (30–52 a year) | 269 | 62 | 27 | 21 |
+| Mask-related | 1% | 91% | 81% | 0% | 5% |
+| Describe violence | **23% (18–30%)** | 3% | 0% | 0% | 0% |
+| Alcohol a factor | 20% | 8% | 8% | 0% | 0% |
+| Police met flight or removed passenger | 29% | 1% | 3% | 7% | 5% |
+
+1. **Before COVID, about 1 in 4 crew-filed misconduct reports described violence.** That is 44 of 191 reports in 2015–19 (95% CI 18–30%). Year by year it ranged from 15% to 30%, with no trend. Some "misconduct" reports were not about behavior at all (service animals, crew rule disputes), so among real behavior incidents the violent share is somewhat higher.
+2. **2020–21 ASRS was flooded by mask reports.** 249 of 269 reports in 2020 and 51 of 62 in 2021 were mask-related, starting when airlines imposed mask rules in summer 2020. Violence appears in about 3% of them. This is the ASRS view of the same mask-driven surge the FAA counted.
+3. **After 2021 ASRS stops capturing interpersonal misconduct, so it cannot answer the question for recent years.** The 48 reports from 2022–26 coded "Passenger Misconduct" are almost all about lithium batteries, dangerous goods, vapes, aerosol sprays and cabin heat; essentially none describe a confrontation. Crews now report unruly passengers to the FAA, the airline and law enforcement under zero tolerance. ASRS is an optional safety channel, and interpersonal incidents largely left it. ASRS may also exclude reports describing criminal acts from its database. I haven't confirmed this, but it would fit, because under zero tolerance assaults are now routinely referred to the FBI. The "0% violent" after 2021 is therefore an artifact of where reports go, not evidence about passengers.
+
+**What this adds.** ASRS gives a pre-COVID benchmark that the FAA does not: about a quarter of crew-reported misconduct incidents involved violence in 2015–19. It also confirms that the 2020–21 surge in reports was overwhelmingly about masks, with violence rare. It cannot tell us whether violent incidents rose after 2021; no public source with a consistent standard covers that period. The best remaining evidence on that point is the federal severe-end series (sentencings about 1.3×, prosecutions up to 2× in FY2025) and violent-incident news coverage (about 2.5–3× per article, see above), and both mix real change with changes in attention and enforcement.
+
+Reproduce: export from ASRS Database Online (Anomaly = Passenger Misconduct, dates 01/2015–latest, all fields) to `raw/asrs/`, code with `raw/asrs/rubric_asrs.md`, then run `python asrs_analysis.py`.
