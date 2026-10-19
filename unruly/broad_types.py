@@ -1,9 +1,10 @@
 """Coverage by story type and distinct incident events, broad-filter GKG sample (Oct 2019-Sep 2026).
 
-Usage: python broad_types.py LABELDIR [SPLITDIR]
+Usage: python broad_types.py LABELDIR [SPLITDIR [VERIFYDIR]]
 LABELDIR/YYYYMM.tsv hold id<TAB>kind<TAB>mask<TAB>us<TAB>event (rubric raw/haiku_labels/rubric_v2.md).
 SPLITDIR/*.tsv hold id<TAB>group for the aggregate_or_policy stories (rubric_v2_policy_split.md);
 health-rule announcements are then reported as health_rule, outside the misconduct counts.
+VERIFYDIR/*.tsv hold id<TAB>yes|no from rubric_v2_violent_verify.md (see below).
 Counts US items (us == 1; us == "?" kept as a sensitivity check):
   aggregate_or_policy: distinct stories
   incident_violent / incident_nonviolent: distinct events (Haiku's event codes, within a month)
@@ -45,6 +46,27 @@ if len(sys.argv) > 2:
     print("policy stories without a split label:", int(grp.isna().sum()))
     s.loc[agg & (s.id.map(sp) == "health_rule"), "kind"] = "health_rule"
     s.loc[agg & (s.id.map(sp) == "other"), "kind"] = "other"
+# third pass (rubric_v2_violent_verify.md): every incident_violent and aggregate_or_policy
+# headline re-checked with one narrow yes/no question. Unconfirmed "violent" headlines become
+# non-violent incidents; policy headlines confirmed as a specific violent incident become one.
+if len(sys.argv) > 3:
+    vv = {}
+    for f in glob.glob(os.path.join(sys.argv[3], "*.tsv")):
+        for line in open(f, encoding="utf8"):
+            p = line.rstrip("\n").split("\t")
+            if len(p) >= 2 and p[0].startswith("b"):
+                vv[p[0]] = p[1].strip().lower()
+    ver = s.id.map(vv)
+    need = s.kind.isin(["incident_violent", "aggregate_or_policy"])
+    print("headlines needing verification without an answer:", int((need & ver.isna()).sum()))
+    down = (s.kind == "incident_violent") & (ver == "no")
+    up = (s.kind == "aggregate_or_policy") & (ver == "yes")
+    print(f"violent -> non-violent: {int(down.sum())} of {int((s.kind == 'incident_violent').sum())};"
+          f" policy -> violent: {int(up.sum())}")
+    s.loc[down, "kind"] = "incident_nonviolent"
+    s.loc[up, "kind"] = "incident_violent"
+    s.loc[up, "event"] = "X" + s.loc[up, "id"]
+    s.loc[up & ~s.us.isin(["0", "1"]), "us"] = "?"
 bad = ~s.kind.isin(KINDS + ["other", "health_rule"])
 print("stories:", len(s), " unlabeled or invalid kind:", int(bad.sum()))
 s.to_csv(os.path.join(HERE, "broad_stories_labeled.csv"), index=False)
