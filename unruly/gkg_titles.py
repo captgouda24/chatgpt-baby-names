@@ -1,6 +1,6 @@
 """Pull unruly-passenger headlines from GDELT GKG 2.0 raw files (fallback for the rate-limited DOC API).
 
-Usage: python gkg_titles.py OUTDIR START_YYYYMM END_YYYYMM [THREADS]
+Usage: python gkg_titles.py OUTDIR START_YYYYMM END_YYYYMM [THREADS] [--broad]
 Reads the :00 file of every hour (a 1-in-4 sample of GKG's 15-minute files), keeps
 articles whose page title matches TITLE, and writes per month:
   OUTDIR/YYYYMM.tsv   file_ts, domain, url, title for matches
@@ -13,6 +13,18 @@ from datetime import datetime, timedelta
 
 TITLE = re.compile(r"unruly passenger|unruly (airline|plane|flight|air) ?(passenger|traveler|flyer)|"
                    r"disruptive passenger|air rage", re.I)
+# --broad: keep a wide superset (misconduct word + aviation/passenger/crew word) so the
+# headline filter can be refined offline; see prep_gkg_batches.py for the filter applied.
+AIRISH = re.compile(r"\b(flights?|planes?|airplanes?|airlines?|airliners?|jetliners?|jets?|in-?flight|mid-?air|aboard|on ?board|"
+                    r"flight attendants?|stewardess(es)?|cabin crew|crew members?|flight crew|pilots?|cockpit|airports?|faa|"
+                    r"passengers?|fliers?|flyers?|travell?ers?)\b", re.I)
+BAD = re.compile(r"punch|\bhit(s|ting)?\b|slap|assault|attack|\bbit(e|es|ing)?\b|kick|chok|strangl|headbutt|stab|fight|brawl|scuffle|"
+                 r"altercation|melee|duct[- ]?tap|zip[- ]?tie|restrain|subdu|tackl|grop|sexual|lewd|masturbat|indecent|urinat|\bspit|"
+                 r"\bspat\b|threat|bomb|hijack|storm|breach|\bdoor|emergency exit|drunk|intoxicat|\bbooze|alcohol|disrupt|unruly|\brage|"
+                 r"meltdown|tirade|\brant|yell|scream|\bslur|racist|abus|harass|\bmasks?\b|maskless|refus|kicked off|booted|removed|"
+                 r"escorted|arrest|charged|pleads?|sentenc|indict|\bjail|prison|\bfined?\b|\bfbi\b|divert|emergency landing|"
+                 r"turn(s|ed)? (back|around)|banned|no-fly|smok|vap(e|ing)|naked|nude|feces|police|\bcops?\b|misconduct|violent|"
+                 r"outburst|rowdy|belligerent|combative|tantrum|disturbance|incident", re.I)
 PT = re.compile(r"<PAGE_TITLE>(.*?)</PAGE_TITLE>")
 
 
@@ -39,13 +51,15 @@ def fetch(ts):
         if not m:  # PAGE_TITLE only exists from about Oct 2019
             continue
         n += 1
-        if TITLE.search(m.group(1)):
+        if TITLE.search(m.group(1)) or (BROAD and AIRISH.search(m.group(1)) and BAD.search(m.group(1))):
             hits.append((ts, f[3], f[4], " ".join(m.group(1).split())))
     return ts, n, hits
 
 
-out, start, end = sys.argv[1], sys.argv[2], sys.argv[3]
-threads = int(sys.argv[4]) if len(sys.argv) > 4 else 16
+BROAD = "--broad" in sys.argv
+args = [a for a in sys.argv[1:] if a != "--broad"]
+out, start, end = args[0], args[1], args[2]
+threads = int(args[3]) if len(args) > 3 else 16
 os.makedirs(out, exist_ok=True)
 m = datetime.strptime(start, "%Y%m")
 while m.strftime("%Y%m") <= end:
