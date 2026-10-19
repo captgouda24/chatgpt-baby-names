@@ -181,7 +181,7 @@ print(ci[["kind", "period", "drift_adjusted_ratio"]].round(2).to_string(index=Fa
 
 # chart (linear scales): top, quarterly coverage by type; bottom, each period's rate relative to
 # Oct 2019-Mar 2020 with month-bootstrap 95% intervals, against FAA reports and federal sentencings
-fig, ax = plt.subplots(2, 1, figsize=(10, 9))
+fig, ax = plt.subplots(2, 1, figsize=(10, 9.5))
 x = g.index.to_timestamp()
 ax[0].stackplot(x, *[g[f"{k}_per_M"] for k in KINDS], colors=[COLS[k] for k in KINDS],
                 labels=[NAMES[k] for k in KINDS], step="post")
@@ -215,8 +215,8 @@ ax[1].axhline(1, color="0.8", lw=0.8)
 ax[1].set_ylim(bottom=0)
 ax[1].set_xticks(xs, lab_x)
 ax[1].set_ylabel("Ratio to Oct 2019–Mar 2020")
-ax[1].legend(frameon=False, fontsize=8, loc="upper right")
+ax[1].legend(frameon=False, fontsize=8, loc="upper center", bbox_to_anchor=(0.5, -0.16), ncol=2)
 for a_ in ax:
     a_.spines[["top", "right"]].set_visible(False)
 fig.tight_layout()
-fig.savefig(os.path.join(HERE, "broad_types.png"), dpi=130)
+fig.savefig(os.path.join(HERE, "broad_types.png"), dpi=130, bbox_inches="tight")

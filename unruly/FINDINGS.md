@@ -77,45 +77,109 @@ Data: GDELT DOC 2.0 daily counts of US-source articles matching "unruly passenge
 
 Caveats: GDELT's source panel changes over time, which the per-1M normalization only partly corrects. Matching on a phrase misses stories that don't say "unruly passenger", and before 2021 that term was probably less standard. The "disruptive/air rage" query shows the same 2021–22 bulge (3,060 articles in 2021 against 1,183 in 2019) but no pre-2020 drop-off from the unruly series. That suggests the vocabulary didn't shift much.
 
-## What kind of stories made up the 2021–22 coverage spike?
+## What kind of stories made up the coverage spike? (broad headline filter)
 
-The question: was the coverage spike mostly statistics and policy stories plus minor incidents that once went unreported, or did coverage of violent incidents rise too?
+The question: was the 2021–22 coverage spike mostly statistics and policy stories, plus minor incidents that once went unreported? Or did coverage of violent incidents rise too?
 
-**Data.** GDELT's DOC API rate-limited this work to a standstill: every request got a 429 for more than two hours. So the 2019–2026 series comes from GDELT's raw GKG 2.0 files, which carry a `<PAGE_TITLE>` only from about October 2019. `gkg_titles.py` reads the :00 file of every hour (one in four of GKG's 15-minute files), 84 months, about 80M articles with a title. It keeps headlines containing "unruly passenger(s)", "disruptive passenger" or "air rage". `prep_gkg_batches.py` keeps US outlets, approximated by domain (.com/.org/.net etc., minus a list of known foreign outlets), and aviation headlines. It then collapses copies of the same story; iHeart radio-station sites repost one story 100+ times with a station suffix. That leaves 733 distinct stories. The DOC API sample pulled earlier (2018 to Q3 2020, missing 2018Q3 and 2020Q2) is labeled the same way in `headlines_classified.csv` and serves as the 2018–19 baseline.
+> **Supersedes an earlier version of this section.** That version matched only headlines containing "unruly/disruptive passenger" or "air rage". Incident stories often don't use those words ("Passenger punches flight attendant"), especially before 2021, so it missed most pre-COVID incident coverage. For example, it found 2 incident stories in Feb 2020, while the broad filter finds 15 distinct incidents (including ones where Haiku could not tell whether the flight was US). It also had a per-passenger normalization bug: the 6-month baseline was divided by total passengers in the period, not monthly passengers. That understated per-passenger rises by about 2×. Both scripts are fixed. The narrow-filter outputs (`gkg_*`) are kept for reference.
 
-**Labels.** Claude Haiku labeled each headline with a fixed rubric:
-- statistics/policy: trends, aggregate FAA fines, laws, unions, explainers
-- violent incident: physical violence, restraint, door or cockpit attempts, sexual assault, threats to kill
-- non-violent incident: mask refusal, verbal, intoxication, diversion or removal without violence
-- other
+### Data and method
 
-Each headline also got a mask flag. On hand-checks of 50 random headlines, I agreed with 46 of 50 labels (92%) in the API sample and 48 of 50 (96%) in the GKG sample. Most disagreements were diversions labeled violent or other, and empty headlines labeled policy. Outputs are in `gkg_headlines_classified.csv`, `gkg_types_quarterly.csv`, `gkg_types_annual.csv` and `gkg_types.png`.
+1. **Headlines.** `gkg_titles.py --broad` reads the :00 GDELT GKG file of every hour from Oct 2019 to Sep 2026. Page titles only exist in GKG from Oct 2019. That is 84 months and about 85M articles with a title. It keeps any headline with a misconduct word plus an aviation, passenger or crew word, about 22,500 a month (`raw/gkg_titles_broad/`).
+2. **Filter.** `prep_broad_batches.py` keeps a headline that either:
+   - matches the old phrase filter, or
+   - has a misconduct word plus a crew word, or a passenger or person word together with a flight, plane or airline word.
 
-Rates are distinct US stories per 1M GKG articles. The "per passenger" columns divide that again by BTS passengers, in units per 100M.
+   It drops ground transport, keeps US outlets (by domain), and collapses copies of the same headline within a month. That leaves 9,331 stories (22,544 headlines).
+3. **Labels** (Claude Haiku, one calendar month per batch, rubric `raw/haiku_labels/rubric_v2.md`):
+   - story type: statistics/policy, violent incident, non-violent incident, other
+   - mask flag
+   - US flight flag
+   - **event code**, so that rewrites of the same incident count once
+4. **Two second passes:**
+   - Policy stories are split into misconduct coverage vs mask/vaccine/alcohol-service announcements (`rubric_v2_policy_split.md`). Health-rule announcements, mostly 2020–22, are excluded from the misconduct counts.
+   - Every headline labeled violent or policy is re-checked with one narrow yes/no question (`rubric_v2_violent_verify.md`). 631 of 2,570 "violent" headlines were downgraded, and 63 policy headlines turned out to be specific violent incidents. An event counts as violent only if a confirmed headline belongs to it.
+5. **Hand checks**, on 60 random first-pass labels:
+   - Overall agreement was 77%: non-violent 19/20, violent 13/20, policy 6/10, other 8/10.
+   - "Violent" was over-applied: "disruptive passenger met by police", "verbal assault", a door failing mid-air.
+   - The verification pass agreed with my judgment on 29 of the 30 violence calls in that sample.
+6. **Measures.**
+   - Distinct US incidents (events) per 1M GKG articles with a title. Misconduct statistics/policy stories are counted per 1M as well.
+   - Intervals are 95% month-block bootstraps of each period's ratio to Oct 2019–Mar 2020. Poisson intervals are in `broad_ratios.csv` and are similar.
+   - Drift check: the filter also catches off-topic headlines (crashes, strikes, airline business). Their rate per 1M is a placebo for changes in GDELT's source panel. "Drift-adjusted" divides by that ratio.
 
-| Period | Stats/policy share | Violent share | Stats/policy per 1M | Non-violent per 1M | Violent per 1M | Non-violent per pax | Violent per pax | FAA reports per 10M pax |
-|---|---|---|---|---|---|---|---|---|
-| Oct 2019–Mar 2020 | 15% | 21% | 0.65 | 2.73 | 0.91 | 0.67 | 0.22 | 16.1 |
-| Apr–Dec 2020 | 40% | 30% | 0.43 | 0.32 | 0.32 | 0.17 | 0.17 | 35.1 |
-| 2021 | **72%** | 9% | **17.1** | 4.39 | 2.20 | 0.66 | 0.33 | 89.7 |
-| 2022 | 55% | 15% | 7.73 | 4.36 | 2.08 | 0.51 | 0.24 | 28.8 |
-| 2023 | 54% | 10% | 4.82 | 3.14 | 0.92 | 0.33 | 0.10 | 22.1 |
-| 2024 | 33% | 25% | 1.54 | 1.94 | 1.13 | 0.20 | 0.12 | 21.4 |
-| 2025 | 19% | 30% | 0.77 | 2.12 | 1.25 | 0.22 | 0.13 | 16.7 |
-| 2026 (Jan–Sep; pax Jan–Jun) | 10% | 40% | 0.71 | 3.55 | 2.84 | 0.97 | 0.39 | 17.8 |
+Outputs: `broad_stories_labeled.csv`, `broad_quarterly.csv`, `broad_annual.csv`, `broad_ratios.csv`, `broad_types.png`.
 
-For comparison, the DOC API sample for 2018–19 (367 stories) is 21% statistics/policy, 47% non-violent and 32% violent.
+### Results
 
-1. **The 2021–22 spike was mostly statistics and policy stories.** Statistics/policy stories went from 0.65 to 17 per 1M monitored articles, 26× the pre-COVID level. They made up 72% of distinct 2021 stories, against 15–30% before COVID. Typical headlines: FAA referral counts, fine totals, no-fly-list proposals, union statements, "incidents are soaring".
-2. **Incident coverage rose far less than reports did.** Per passenger flown, non-violent incident stories were flat in 2021 (0.66 vs 0.67) and below baseline in 2022–25. Violent incident stories rose about 1.5× in 2021 and 1.1× in 2022, while FAA reports per passenger rose 5.6× and 1.8×. The pre-COVID base has only 7 violent stories, so the 1.5× has wide error bars, roughly ±2× on a Poisson basis. It is still nowhere near 5.6×.
-3. **Masks barely appear in headlines.** About 72% of 2021 FAA reports were mask-related, but only 6% of 2021 stories mention masks (4% of non-violent incident stories). The mask-refusal reports that drove the count were mostly never covered as individual stories. They reached the news in aggregate, as statistics.
-4. **This matches the severe-end series.** Federal sentencings under USSG §2A5.2 (interference with a flight crew) were 16–27 a year in FY2017–2023 and 28–29 in FY2024–25 (`raw/severe/ussc_2A5_2.csv`). TRAC § 46504 lead-charge prosecutions were 18–28 a year in FY2011–2024. FY2025 shows 48, a real uptick worth watching, but it arrives three years after the spike (`raw/severe/trac_lead_charge_snapshots.csv`). Violent-incident coverage per passenger, sentencings and prosecutions all moved within about 1–1.5× of baseline through 2021–22, while reports moved 5.6×. The evidence points to a surge in reporting and in aggregate attention, not a matching surge in violent misconduct.
-5. **2026 looks different, but it is a few stories.** The violent share is 40% and violent stories per passenger are 1.8× baseline, without any rise in FAA reports. Twenty distinct stories, several heavily syndicated (a cockpit-breach diversion, a "threaten to take over the plane" grounding, a duct-tape restraint), drive this. Copy-weighted volume (`vol_*` columns) exaggerates it further because of iHeart reposts. It is consistent with the news-coverage finding above that 2026 coverage spikes are a handful of viral incidents.
+US incidents (events) and misconduct statistics/policy stories, per 1M monitored articles:
+
+| Period | Stats/policy stories | Non-violent incidents | Violent incidents | Violent vs base (95% CI) | Violent, drift-adjusted | FAA reports per 10M pax |
+|---|---|---|---|---|---|---|
+| Oct 2019–Mar 2020 (base) | 0.13 | 4.0 | 2.2 (17 events) | 1 | 1 | 16.1 |
+| Apr–Dec 2020 | 5.5 (+7.8 mask-rule) | 4.9 | 1.7 | 0.8 (0.3–1.5) | 1.2 | 35.1 |
+| 2021 | **21.8** | 7.2 | 7.3 | **3.3 (2.1–5.4)** | 4.1 | **89.7** |
+| 2022 | 8.5 | 7.6 | 7.0 | 3.2 (1.9–5.3) | 3.2 | 28.8 |
+| 2023 | 3.7 | 6.0 | 5.6 | 2.5 (1.6–4.0) | 2.3 | 22.1 |
+| 2024 | 1.5 | 5.2 | 5.1 | 2.3 (1.6–3.6) | 1.4 | 21.4 |
+| 2025 | 0.2 | 4.4 | 7.9 | 3.6 (2.3–5.6) | 3.0 | 16.7 |
+| 2026 (Jan–Sep) | 1.9 | 4.4 | 5.8 | 2.6 (1.8–4.2) | 1.6 | 17.8 (Jan–Jun) |
+
+Same calendar window each year (Oct–Mar), which removes seasonality and the partial-year problem:
+
+| Oct–Mar | Violent incidents | per 1M articles | per 100M passengers | Off-topic stories per 1M (drift) | FAA reports per 10M pax |
+|---|---|---|---|---|---|
+| 2019–20 | 17 | 2.2 | 4.2 | 46 | 16.1 |
+| 2020–21 | 20 | 3.7 | 10.8 | 27 | 93.8 |
+| 2021–22 | 34 | 6.3 | 9.0 | 39 | 65.5 |
+| 2022–23 | 28 | 5.8 | 6.5 | 57 | 20.1 |
+| 2023–24 | 39 | 6.0 | 8.4 | 76 | 21.4 |
+| 2024–25 | 31 | 5.4 | 6.7 | 60 | 19.0 |
+| 2025–26 | 31 | 6.1 | 6.7 | 56 | 17.1 |
+
+1. **The 2021–22 spike was mostly statistics and policy stories.**
+   - Misconduct statistics/policy stories went from almost none before COVID to 21.8 per 1M in 2021. They were 60% of all misconduct items that year.
+   - Typical headlines: FAA referral and fine totals, "incidents soar", no-fly-list bills, union statements, alcohol-to-go requests.
+   - Mask-requirement announcements were another large block in 2020–22 and are counted separately.
+   - The statistics/policy share fell back to 2–15% by 2025–26.
+2. **Non-violent incident coverage rose modestly and then returned to baseline.**
+   - It rose 1.8–1.9× in 2021–22 (CIs 1.3–2.9), while FAA reports rose 5.6× and 1.8×.
+   - By 2024–26 it was about 1.1–1.3×, with CIs that include 1.
+   - Mask refusals, which were 72% of 2021 FAA reports, mostly never became individual stories.
+3. **Violent incident coverage rose about 3× in 2021 and has not come back down.**
+   - It was 3.3× in 2021 and 2.3–3.6× in every year since, with every interval above 1.
+   - The season-matched windows show the same thing: about 2.5–3× per article and 1.6–2× per passenger, every winter since 2021.
+   - Over the same years FAA reports per passenger fell back to 1.0–1.3×.
+   - Correcting for source-panel drift shrinks the late years (1.4× in 2024, 1.6× in 2026) but not 2021–23 or 2025.
+4. **This is not one viral video being re-run.**
+   - Distinct stories per violent incident were 4.9 before COVID and 3.4–5.4 since.
+   - Syndicated copies per violent incident fell, from 22 to 9–14.
+   - The rise is in the number of distinct violent incidents covered, not in pile-ons around a few videos.
+5. **Severe-end comparison.**
+   - Federal sentencings under USSG §2A5.2 averaged 21.5 a year in FY2019–20 and 28–29 in FY2024–25, about 1.3× (`raw/severe/ussc_2A5_2.csv`).
+   - TRAC § 46504 lead-charge prosecutions were 18–28 a year through FY2024, then 48 in FY2025 (`raw/severe/trac_lead_charge_snapshots.csv`).
+   - So the severe end has also drifted up a little since 2021, about 1.3–2×, though less than violent-incident coverage.
+
+**Interpretation.**
+- The 2021 surge in reports is mostly policy and recording, as the sections above find. News coverage tracked it mainly through statistics stories, not through more incident stories.
+- Violent incidents are different. Their coverage per article has stayed about 2.5–3× its pre-COVID level since 2021, and the federal severe-end series are also somewhat higher in the latest years.
+- That is consistent with two explanations, and probably some of both:
+  - **More attention:** "air rage" became an established story genre, and filmed incidents are easier to report.
+  - **A modest real increase** in the most serious incidents, on the order of the 1.3–2× seen in sentencings and prosecutions.
+- FAA's totals can't settle it, because they don't separate violent cases.
+- What the data does rule out is a 5× rise in serious misconduct in 2021 like the jump in reports.
 
 Caveats:
-- GKG matches on headlines, while the DOC API matched full text. The two samples agree on violent share where they overlap (Oct 2019–Mar 2020: 21% vs 25%), but the headline sample has fewer statistics/policy pieces (15% vs 30%). So the 2018–19 API numbers are a baseline for shares only, not for rates.
-- The US filter is by domain and imperfect. A few US-outlet stories are about foreign flights (e.g. IndiGo, Shannon).
-- The 1-in-4 file sample and small annual story counts (12–25 violent stories a year) make single-year rates noisy. Read the series for multiples of 3× or more, not 20% moves.
-- Haiku labels headlines only. A story whose headline says "diverted" may involve violence described in the body, which biases the violent counts down evenly across years.
+- The baseline is short, 6 months with 17 violent incidents, and GKG has no headlines before Oct 2019. Intervals reflect this but are wide.
+- Labels come from headlines only; a story whose headline says "diverted" may involve violence.
+- Haiku's event codes group rewrites within a month only, so a story spanning two months, or a later sentencing story, counts again.
+- The US filter (domain plus Haiku's US-flight flag) is imperfect. Results using "US or unsure" incidents are in `broad_annual.csv` (`*_incl_unsure`) and show the same pattern.
+- The drift placebo includes COVID-era airline news (crashes, strikes, quarantines), so it is a rough correction.
 
-Reproduce: `python gkg_titles.py raw/gkg_titles 201910 202609 48`, then `python prep_gkg_batches.py <dir>` (writes batches for Haiku), then `python gkg_headline_types.py raw/haiku_labels/gkg`. For the API sample, run `python headline_types.py raw/haiku_labels/api`. The labeling rubric is in `raw/haiku_labels/rubric.md`.
+Reproduce:
+1. `python gkg_titles.py raw/gkg_titles_broad 201910 202609 48 --broad`
+2. `python prep_broad_batches.py raw/gkg_titles_broad <dir>` (writes monthly batches for Haiku, rubric v2)
+3. The policy-split and violent-verify passes (rubrics in `raw/haiku_labels/`)
+4. `python broad_types.py raw/haiku_labels/broad raw/haiku_labels/broad_policy_split raw/haiku_labels/broad_violent_verify`
+
+The narrow-filter version: `python gkg_headline_types.py raw/haiku_labels/gkg`. The 2018–20 DOC-API sample: `python headline_types.py raw/haiku_labels/api`.
