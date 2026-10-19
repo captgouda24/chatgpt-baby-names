@@ -1,7 +1,9 @@
 """Coverage by story type and distinct incident events, broad-filter GKG sample (Oct 2019-Sep 2026).
 
-Usage: python broad_types.py LABELDIR
+Usage: python broad_types.py LABELDIR [SPLITDIR]
 LABELDIR/YYYYMM.tsv hold id<TAB>kind<TAB>mask<TAB>us<TAB>event (rubric raw/haiku_labels/rubric_v2.md).
+SPLITDIR/*.tsv hold id<TAB>group for the aggregate_or_policy stories (rubric_v2_policy_split.md);
+health-rule announcements are then reported as health_rule, outside the misconduct counts.
 Counts US items (us == 1; us == "?" kept as a sensitivity check):
   aggregate_or_policy: distinct stories
   incident_violent / incident_nonviolent: distinct events (Haiku's event codes, within a month)
@@ -28,7 +30,22 @@ for f in sorted(glob.glob(os.path.join(sys.argv[1], "*.tsv"))):
             lab.append(dict(id=p[0], kind=p[1].strip(), mask=p[2].strip(), us=p[3].strip(), event=p[4].strip()))
 lab = pd.DataFrame(lab).drop_duplicates("id")
 s = pd.read_csv(os.path.join(HERE, "broad_stories.csv")).merge(lab, on="id", how="left")
-bad = ~s.kind.isin(KINDS + ["other"])
+# second pass (rubric_v2_policy_split.md): general stories that only announce health rules
+# (mask/vaccine/alcohol-service changes with no misconduct angle) are counted separately
+if len(sys.argv) > 2:
+    sp = []
+    for f in glob.glob(os.path.join(sys.argv[2], "*.tsv")):
+        for line in open(f, encoding="utf8"):
+            p = line.rstrip("\n").split("\t")
+            if len(p) >= 2 and p[0].startswith("b"):
+                sp.append(dict(id=p[0], group=p[1].strip()))
+    sp = pd.DataFrame(sp).drop_duplicates("id").set_index("id").group
+    agg = s.kind == "aggregate_or_policy"
+    grp = s.loc[agg, "id"].map(sp)
+    print("policy stories without a split label:", int(grp.isna().sum()))
+    s.loc[agg & (s.id.map(sp) == "health_rule"), "kind"] = "health_rule"
+    s.loc[agg & (s.id.map(sp) == "other"), "kind"] = "other"
+bad = ~s.kind.isin(KINDS + ["other", "health_rule"])
 print("stories:", len(s), " unlabeled or invalid kind:", int(bad.sum()))
 s.to_csv(os.path.join(HERE, "broad_stories_labeled.csv"), index=False)
 
@@ -48,6 +65,7 @@ s.loc[inc, "us"] = s.loc[inc, "ev"].map(ev_us)
 def counts(sub):
     out = pd.DataFrame(index=sorted(s.q.unique()))
     out["aggregate_or_policy"] = sub[sub.kind == "aggregate_or_policy"].groupby("q").size()
+    out["health_rule"] = sub[sub.kind == "health_rule"].groupby("q").size()
     for k in ["incident_nonviolent", "incident_violent"]:
         e = sub[sub.kind_ev == k]
         out[k] = e.groupby("q").ev.nunique()
@@ -71,7 +89,7 @@ for k in KINDS:
 g.round(4).to_csv(os.path.join(HERE, "broad_quarterly.csv"))
 
 g["per"] = [("base" if q < pd.Period("2020Q2") else str(q.year)) for q in g.index]
-cols = ["den"] + KINDS + [f"{k}_incl_unsure" for k in KINDS] + [f"stories_{k}" for k in KINDS[1:]] + [f"copies_{k}" for k in KINDS[1:]]
+cols = ["den", "health_rule"] + KINDS + [f"{k}_incl_unsure" for k in KINDS] + [f"stories_{k}" for k in KINDS[1:]] + [f"copies_{k}" for k in KINDS[1:]]
 a = g.groupby("per")[cols].sum()
 full = g.dropna(subset=["pax"]).groupby("per")[["den", "reports", "pax"] + KINDS].sum()
 for k in KINDS:
@@ -81,6 +99,7 @@ for k in KINDS:
 for k in KINDS[1:]:
     a[f"stories_per_event_{k}"] = a[f"stories_{k}"] / a[k]
     a[f"copies_per_event_{k}"] = a[f"copies_{k}"] / a[k]
+a["health_rule_per_M"] = a.health_rule / a.den * 1e6
 a["agg_share_of_items"] = a.aggregate_or_policy / a[KINDS].sum(axis=1)
 a["faa_reports_per_10M_pax"] = full.reports / full.pax * 1e7
 a = a.reindex(["base"] + [str(y) for y in range(2020, 2027)])
