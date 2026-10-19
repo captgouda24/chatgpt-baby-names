@@ -47,12 +47,14 @@ g.round(4).to_csv(os.path.join(HERE, "gkg_types_quarterly.csv"))
 # annual (Oct 2019-Mar 2020 = pre-COVID base; 2026 = Jan-Sep; pax-based rates use quarters with full BTS data)
 g["per"] = [("base" if q < pd.Period("2020Q2") else str(q.year)) for q in g.index]
 a = g.groupby("per")[["den"] + KINDS + [f"uniq_{k}" for k in KINDS]].sum()
-full = g.dropna(subset=["pax"]).groupby("per")[["den", "reports", "pax"] + KINDS + [f"uniq_{k}" for k in KINDS]].sum()
+g["pax_months"] = g.pax.notna() * 3
+full = g.dropna(subset=["pax"]).groupby("per")[["den", "reports", "pax", "pax_months"] + KINDS + [f"uniq_{k}" for k in KINDS]].sum()
+full["pax_per_month"] = full.pax / full.pax_months  # periods differ in length; use average monthly passengers
 for k in KINDS:
     a[f"vol_{k}"] = a[k] / a.den * 1e6
     a[f"uniq_{k}_per_M"] = a[f"uniq_{k}"] / a.den * 1e6
     a[f"share_{k}"] = a[f"uniq_{k}"] / a[[f"uniq_{j}" for j in KINDS]].sum(axis=1)
-    a[f"uniq_{k}_per_M_per_100M_pax"] = (full[f"uniq_{k}"] / full.den * 1e6) / full.pax * 1e8
+    a[f"uniq_{k}_per_M_per_100M_pax"] = (full[f"uniq_{k}"] / full.den * 1e6) / full.pax_per_month * 1e8
 a["faa_reports_per_10M_pax"] = full.reports / full.pax * 1e7
 a = a.reindex(["base"] + [str(y) for y in range(2020, 2027)])
 a.round(3).to_csv(os.path.join(HERE, "gkg_types_annual.csv"))

@@ -91,11 +91,13 @@ g.round(4).to_csv(os.path.join(HERE, "broad_quarterly.csv"))
 g["per"] = [("base" if q < pd.Period("2020Q2") else str(q.year)) for q in g.index]
 cols = ["den", "health_rule"] + KINDS + [f"{k}_incl_unsure" for k in KINDS] + [f"stories_{k}" for k in KINDS[1:]] + [f"copies_{k}" for k in KINDS[1:]]
 a = g.groupby("per")[cols].sum()
-full = g.dropna(subset=["pax"]).groupby("per")[["den", "reports", "pax"] + KINDS].sum()
+g["pax_months"] = g.pax.notna() * 3
+full = g.dropna(subset=["pax"]).groupby("per")[["den", "reports", "pax", "pax_months"] + KINDS].sum()
+full["pax_per_month"] = full.pax / full.pax_months  # periods differ in length; use average monthly passengers
 for k in KINDS:
     a[f"{k}_per_M"] = a[k] / a.den * 1e6
     a[f"{k}_incl_unsure_per_M"] = a[f"{k}_incl_unsure"] / a.den * 1e6
-    a[f"{k}_per_M_per_100M_pax"] = (full[k] / full.den * 1e6) / full.pax * 1e8
+    a[f"{k}_per_M_per_100M_pax"] = (full[k] / full.den * 1e6) / full.pax_per_month * 1e8
 for k in KINDS[1:]:
     a[f"stories_per_event_{k}"] = a[f"stories_{k}"] / a[k]
     a[f"copies_per_event_{k}"] = a[f"copies_{k}"] / a[k]
@@ -139,3 +141,43 @@ for a_ in ax:
     a_.spines[["top", "right"]].set_visible(False)
 fig.tight_layout()
 fig.savefig(os.path.join(HERE, "broad_types.png"), dpi=130)
+
+# uncertainty: ratio of each period's rate (per 1M articles) to the Oct 2019-Mar 2020 base.
+# Poisson: log-scale interval from the two counts. Bootstrap: resample whole months within
+# each period (captures clustering of coverage around viral events), 4000 draws.
+import numpy as np
+mo = s.copy()
+mo["m"] = mo.month.astype(str)
+mon = pd.DataFrame(index=sorted(den.month.astype(str)))
+mon["den"] = den.set_index(den.month.astype(str)).gkg_titled_articles
+u = mo[mo.us == "1"]
+mon["aggregate_or_policy"] = u[u.kind == "aggregate_or_policy"].groupby("m").size()
+for k in ["incident_nonviolent", "incident_violent"]:
+    mon[k] = u[u.kind_ev == k].groupby("m").ev.nunique()
+mon = mon.fillna(0)
+mon["per"] = ["base" if m < "202004" else m[:4] for m in mon.index]
+rng = np.random.default_rng(0)
+rows = []
+for k in KINDS:
+    b = mon[mon.per == "base"]
+    for per in [p for p in a.index if p != "base"]:
+        x = mon[mon.per == per]
+        if x.empty:
+            continue
+        rb, rx = b[k].sum() / b.den.sum(), x[k].sum() / x.den.sum()
+        rr = rx / rb if rb else float("nan")
+        se = np.sqrt(1 / max(x[k].sum(), 0.5) + 1 / max(b[k].sum(), 0.5))
+        bs = []
+        for _ in range(4000):
+            bb = b.iloc[rng.integers(0, len(b), len(b))]
+            xx = x.iloc[rng.integers(0, len(x), len(x))]
+            r0 = bb[k].sum() / bb.den.sum()
+            bs.append((xx[k].sum() / xx.den.sum()) / r0 if r0 else np.nan)
+        bs = np.array(bs)
+        rows.append(dict(kind=k, period=per, count=int(x[k].sum()), base_count=int(b[k].sum()), ratio=rr,
+                         poisson_lo=rr * np.exp(-1.96 * se), poisson_hi=rr * np.exp(1.96 * se),
+                         boot_lo=np.nanpercentile(bs, 2.5), boot_hi=np.nanpercentile(bs, 97.5),
+                         boot_undefined_share=np.isnan(bs).mean()))
+ci = pd.DataFrame(rows)
+ci.round(3).to_csv(os.path.join(HERE, "broad_ratios.csv"), index=False)
+print(ci.round(2).to_string(index=False))
