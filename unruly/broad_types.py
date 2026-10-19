@@ -131,39 +131,6 @@ a.round(3).to_csv(os.path.join(HERE, "broad_annual.csv"))
 pd.set_option("display.width", 220)
 print(a.round(2).T.to_string())
 
-# chart: linear scales
-fig, ax = plt.subplots(2, 1, figsize=(10, 8.5))
-x = g.index.to_timestamp()
-ax[0].stackplot(x, *[g[f"{k}_per_M"] for k in KINDS], colors=[COLS[k] for k in KINDS],
-                labels=[NAMES[k] for k in KINDS], step="post")
-top = ax[0].get_ylim()[1] * 1.12
-ax[0].set_ylim(0, top)
-ax[0].axvspan(pd.Timestamp("2021-02-01"), pd.Timestamp("2022-04-18"), color="0.92", zorder=0)
-ax[0].text(pd.Timestamp("2021-02-15"), top * 0.97, "federal mask mandate", fontsize=8, color="0.4", va="top")
-ax[0].set_ylabel("Per 1M monitored articles\n(stories, or distinct incident events)")
-ax[0].set_title("US news coverage of airline passenger misconduct, broad headline filter (GDELT GKG, Haiku-labeled)", loc="left")
-ax[0].legend(loc="upper right", frameon=False)
-
-ussc = pd.read_csv(os.path.join(HERE, "raw", "severe", "ussc_2A5_2.csv")).set_index("fiscal_year").offender_based_any_applied_2A5_2
-yrs = [str(y) for y in range(2020, 2027)]
-xs = list(range(len(yrs) + 1))
-lab_x = ["Oct19–\nMar20", "Apr–Dec\n2020"] + yrs[1:-1] + ["2026\nJan–Jun"]
-series = {f"{k}_per_M_per_100M_pax": (NAMES[k] + " / passenger", COLS[k]) for k in KINDS[1:]}
-series["faa_reports_per_10M_pax"] = ("FAA unruly reports / passenger", "0.2")
-for c, (nm, col) in series.items():
-    ax[1].plot(xs, (a[c] / a.loc["base", c]).values, marker="o", color=col, label=nm)
-fy = [ussc.get(int(y), float("nan")) / ussc.loc[[2019, 2020]].mean() for y in yrs]
-ax[1].plot(xs, [1.0] + fy, marker="s", ls="--", color="0.5", label="Federal §2A5.2 sentencings (FY, base FY19–20)")
-ax[1].axhline(1, color="0.8", lw=0.8)
-ax[1].set_ylim(bottom=0)
-ax[1].set_xticks(xs, lab_x)
-ax[1].set_ylabel("Index, Oct 2019–Mar 2020 = 1")
-ax[1].legend(frameon=False, fontsize=8, loc="upper right")
-for a_ in ax:
-    a_.spines[["top", "right"]].set_visible(False)
-fig.tight_layout()
-fig.savefig(os.path.join(HERE, "broad_types.png"), dpi=130)
-
 # uncertainty: ratio of each period's rate (per 1M articles) to the Oct 2019-Mar 2020 base.
 # Poisson: log-scale interval from the two counts. Bootstrap: resample whole months within
 # each period (captures clustering of coverage around viral events), 4000 draws.
@@ -176,11 +143,13 @@ u = mo[mo.us == "1"]
 mon["aggregate_or_policy"] = u[u.kind == "aggregate_or_policy"].groupby("m").size()
 for k in ["incident_nonviolent", "incident_violent"]:
     mon[k] = u[u.kind_ev == k].groupby("m").ev.nunique()
+# drift placebo: off-topic headlines the filter also catches (kind == other, any outlet)
+mon["other"] = mo[mo.kind == "other"].groupby("m").size()
 mon = mon.fillna(0)
 mon["per"] = ["base" if m < "202004" else m[:4] for m in mon.index]
 rng = np.random.default_rng(0)
 rows = []
-for k in KINDS:
+for k in KINDS + ["other"]:
     b = mon[mon.per == "base"]
     for per in [p for p in a.index if p != "base"]:
         x = mon[mon.per == per]
@@ -203,3 +172,51 @@ for k in KINDS:
 ci = pd.DataFrame(rows)
 ci.round(3).to_csv(os.path.join(HERE, "broad_ratios.csv"), index=False)
 print(ci.round(2).to_string(index=False))
+
+# drift-adjusted ratio: divide by the off-topic ratio for the same period
+oth = ci[ci.kind == "other"].set_index("period").ratio
+ci["drift_adjusted_ratio"] = ci.ratio / ci.period.map(oth)
+ci.round(3).to_csv(os.path.join(HERE, "broad_ratios.csv"), index=False)
+print(ci[["kind", "period", "drift_adjusted_ratio"]].round(2).to_string(index=False))
+
+# chart (linear scales): top, quarterly coverage by type; bottom, each period's rate relative to
+# Oct 2019-Mar 2020 with month-bootstrap 95% intervals, against FAA reports and federal sentencings
+fig, ax = plt.subplots(2, 1, figsize=(10, 9))
+x = g.index.to_timestamp()
+ax[0].stackplot(x, *[g[f"{k}_per_M"] for k in KINDS], colors=[COLS[k] for k in KINDS],
+                labels=[NAMES[k] for k in KINDS], step="post")
+top = ax[0].get_ylim()[1] * 1.12
+ax[0].set_ylim(0, top)
+ax[0].axvspan(pd.Timestamp("2021-02-01"), pd.Timestamp("2022-04-18"), color="0.92", zorder=0)
+ax[0].text(pd.Timestamp("2021-02-15"), top * 0.97, "federal mask mandate", fontsize=8, color="0.4", va="top")
+ax[0].set_ylabel("Per 1M monitored articles\n(misconduct stories, or distinct incidents)")
+ax[0].set_title("US news coverage of airline passenger misconduct (GDELT headlines, Haiku-labeled)", loc="left")
+ax[0].legend(loc="upper right", frameon=False)
+
+pers = ["base"] + [str(y) for y in range(2020, 2027)]
+xs = list(range(len(pers)))
+lab_x = ["Oct19–\nMar20", "Apr–Dec\n2020"] + [str(y) for y in range(2021, 2026)] + ["2026\nJan–Sep"]
+for off, k in [(-0.12, "incident_violent"), (0.12, "incident_nonviolent")]:
+    c = ci[ci.kind == k].set_index("period").reindex(pers[1:])
+    yv = [1.0] + list(c.ratio)
+    lo = [0.0] + list(c.ratio - c.boot_lo)
+    hi = [0.0] + list(c.boot_hi - c.ratio)
+    ax[1].errorbar([v + off for v in xs], yv, yerr=[lo, hi], fmt="o-", color=COLS[k], capsize=3,
+                   label=NAMES[k] + " per article (95% CI)")
+    adj = [1.0] + list(c.drift_adjusted_ratio)
+    if k == "incident_violent":
+        ax[1].plot([v + off for v in xs], adj, ls=":", color=COLS[k], marker=".", label="Violent, adjusted for source-panel drift")
+faa = a["faa_reports_per_10M_pax"].reindex(pers)
+ax[1].plot(xs, (faa / faa["base"]).values, marker="s", color="0.2", label="FAA unruly reports per passenger")
+ussc = pd.read_csv(os.path.join(HERE, "raw", "severe", "ussc_2A5_2.csv")).set_index("fiscal_year").offender_based_any_applied_2A5_2
+fy = [1.0] + [ussc.get(int(p), float("nan")) / ussc.loc[[2019, 2020]].mean() for p in pers[1:]]
+ax[1].plot(xs, fy, marker="s", ls="--", color="0.55", label="Federal §2A5.2 sentencings (FY, base FY19–20)")
+ax[1].axhline(1, color="0.8", lw=0.8)
+ax[1].set_ylim(bottom=0)
+ax[1].set_xticks(xs, lab_x)
+ax[1].set_ylabel("Ratio to Oct 2019–Mar 2020")
+ax[1].legend(frameon=False, fontsize=8, loc="upper right")
+for a_ in ax:
+    a_.spines[["top", "right"]].set_visible(False)
+fig.tight_layout()
+fig.savefig(os.path.join(HERE, "broad_types.png"), dpi=130)
