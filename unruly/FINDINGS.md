@@ -157,15 +157,15 @@ Same calendar window each year (Oct–Mar), which removes seasonality and the pa
    - The rise is in the number of distinct violent incidents covered, not in pile-ons around a few videos.
 5. **Severe-end comparison.**
    - Federal sentencings under USSG §2A5.2 averaged 21.5 a year in FY2019–20 and 28–29 in FY2024–25, about 1.3× (`raw/severe/ussc_2A5_2.csv`).
-   - TRAC § 46504 lead-charge prosecutions were 18–28 a year through FY2024, then 48 in FY2025 (`raw/severe/trac_lead_charge_snapshots.csv`).
-   - So the severe end has also drifted up a little since 2021, about 1.3–2×, though less than violent-incident coverage.
+   - TRAC § 46504 lead-charge prosecutions were 18–28 a year through FY2024 (`raw/severe/trac_lead_charge_snapshots.csv`). TRAC shows 48 for FY2025, but that figure has not changed since the March 2025 snapshot and is flagged partial/anomalous, so I don't use it.
+   - Per passenger, both series were about 1.7–1.8× their FY2018–19 level in FY2021, when passenger numbers were low, and about 0.8–1.3× from FY2022 on (see the federal cases section).
 
 **Interpretation.**
 - The 2021 surge in reports is mostly policy and recording, as the sections above find. News coverage tracked it mainly through statistics stories, not through more incident stories.
 - Violent incidents are different. Their coverage per article has stayed about 2.5–3× its pre-COVID level since 2021, and the federal severe-end series are also somewhat higher in the latest years.
 - That is consistent with two explanations, and probably some of both:
   - **More attention:** "air rage" became an established story genre, and filmed incidents are easier to report.
-  - **A modest real increase** in the most serious incidents, on the order of the 1.3–2× seen in sentencings and prosecutions.
+  - **A modest real increase** in the most serious incidents. The federal series allow at most a small one: per passenger they are about 0.8–1.3× FY2018–19 since FY2022.
 - FAA's totals can't settle it, because they don't separate violent cases.
 - What the data does rule out is a 5× rise in serious misconduct in 2021 like the jump in reports.
 
@@ -202,7 +202,7 @@ Haiku read each full narrative and coded it with the same violence definition us
 2. **2020–21 ASRS was flooded by mask reports.** 249 of 269 reports in 2020 and 51 of 62 in 2021 were mask-related, starting when airlines imposed mask rules in summer 2020. Violence appears in about 3% of them. This is the ASRS view of the same mask-driven surge the FAA counted.
 3. **After 2021 ASRS stops capturing interpersonal misconduct, so it cannot answer the question for recent years.** The 48 reports from 2022–26 coded "Passenger Misconduct" are almost all about lithium batteries, dangerous goods, vapes, aerosol sprays and cabin heat; essentially none describe a confrontation. Crews now report unruly passengers to the FAA, the airline and law enforcement under zero tolerance. ASRS is an optional safety channel, and interpersonal incidents largely left it. ASRS may also exclude reports describing criminal acts from its database. I haven't confirmed this, but it would fit, because under zero tolerance assaults are now routinely referred to the FBI. The "0% violent" after 2021 is therefore an artifact of where reports go, not evidence about passengers.
 
-**What this adds.** ASRS gives a pre-COVID benchmark that the FAA does not: about a quarter of crew-reported misconduct incidents involved violence in 2015–19. It also confirms that the 2020–21 surge in reports was overwhelmingly about masks, with violence rare. It cannot tell us whether violent incidents rose after 2021; no public source with a consistent standard covers that period. The best remaining evidence on that point is the federal severe-end series (sentencings about 1.3×, prosecutions up to 2× in FY2025) and violent-incident news coverage (about 2.5–3× per article, see above), and both mix real change with changes in attention and enforcement.
+**What this adds.** ASRS gives a pre-COVID benchmark that the FAA does not: about a quarter of crew-reported misconduct incidents involved violence in 2015–19. It also confirms that the 2020–21 surge in reports was overwhelmingly about masks, with violence rare. It cannot tell us whether violent incidents rose after 2021; no public source with a consistent standard covers that period. The best remaining evidence on that point is the federal severe-end series (sentencings and prosecutions per passenger about 0.8–1.3× FY2018–19 since FY2022) and violent-incident news coverage (about 2.5–3× per article, see above), and both mix real change with changes in attention and enforcement.
 
 Reproduce: export from ASRS Database Online (Anomaly = Passenger Misconduct, dates 01/2015–latest, all fields) to `raw/asrs/`, code with `raw/asrs/rubric_asrs.md`, then run `python asrs_analysis.py`.
 
@@ -224,3 +224,24 @@ Caveats:
 - Only crimes recorded by Chicago police on aircraft at ORD/MDW count. That is about 5% of US passengers, and largely incidents on flights arriving in or departing Chicago.
 - Some in-flight assaults may be handled by the FBI or airline without a CPD report. If that diversion grew after the 2021 FBI referral program, CPD counts would understate later years.
 - The old catch-all `AIRPORT/AIRCRAFT` code (mostly narcotics and airport-wide crime) was retired after 2023 and is excluded; its violent counts were small (0–15 a year since 2010).
+
+## Federal criminal cases, per passenger
+
+Sources:
+- US Sentencing Commission: offenders sentenced under guideline §2A5.2 (interference with a flight crew), FY2015–25.
+- TRAC: prosecutions with lead charge 49 U.S.C. § 46504 (interference with flight crew) and § 46506 (assault on an aircraft), from Wayback snapshots, so some years are missing.
+
+Passengers are BTS totals per federal fiscal year (Oct–Sep). The BTS file lists April 2023 twice; the script deduplicates it. Outputs: `federal_cases.csv`, `federal_cases_index.csv`, `federal_cases.png`; reproduce with `python federal_cases.py`.
+
+Per passenger, relative to the FY2018–19 average:
+
+| FY | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 |
+|---|---|---|---|---|---|---|---|---|---|
+| §2A5.2 sentenced | 0.91 | 0.82 | 1.18 | 1.25 | **1.80** | 1.30 | 0.87 | 1.19 | 1.15 |
+| §46504 prosecutions | 0.74 | – | 1.00 | 1.15 | **1.65** | 0.91 | – | 0.80 | (partial) |
+| FAA unruly reports | – | 0.78 | 1.22 | 1.97 | **8.39** | 3.99 | 2.09 | 2.08 | 1.68 |
+
+1. **The raw counts barely moved:** 16–32 sentencings and 18–28 prosecutions a year throughout. § 46506 assault-on-aircraft prosecutions rose from 4–6 a year to 8–11 a year from FY2022, small numbers that may partly reflect the FBI referral program.
+2. **Per passenger, federal cases rose about 1.7–1.8× in FY2021.** Counts held steady while passenger numbers were low. FAA reports per passenger rose 8.4× that year, so federal cases rose about a fifth as much.
+3. **Since FY2022, federal cases per passenger have been at about their pre-COVID level (0.8–1.3×).** FAA reports per passenger stayed at about 2× through FY2024.
+4. **Correction.** Earlier I cited TRAC's FY2025 figure of 48 § 46504 prosecutions as a near-doubling. That figure is flagged in the source file as partial and anomalous, because it has not changed since March 2025. It is excluded here, and the earlier sections are corrected.
