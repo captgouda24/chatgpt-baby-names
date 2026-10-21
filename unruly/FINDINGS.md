@@ -205,3 +205,22 @@ Haiku read each full narrative and coded it with the same violence definition us
 **What this adds.** ASRS gives a pre-COVID benchmark that the FAA does not: about a quarter of crew-reported misconduct incidents involved violence in 2015–19. It also confirms that the 2020–21 surge in reports was overwhelmingly about masks, with violence rare. It cannot tell us whether violent incidents rose after 2021; no public source with a consistent standard covers that period. The best remaining evidence on that point is the federal severe-end series (sentencings about 1.3×, prosecutions up to 2× in FY2025) and violent-incident news coverage (about 2.5–3× per article, see above), and both mix real change with changes in attention and enforcement.
 
 Reproduce: export from ASRS Database Online (Anomaly = Passenger Misconduct, dates 01/2015–latest, all fields) to `raw/asrs/`, code with `raw/asrs/rubric_asrs.md`, then run `python asrs_analysis.py`.
+
+## Chicago police: crimes on aircraft at O'Hare and Midway
+
+A police crime code is a recording standard that FAA enforcement policy does not change. The Chicago Police Department covers O'Hare (community area 76) and Midway (56), and its public crime data (Crimes – 2001 to Present) has a location code `AIRCRAFT`. I took every crime with that code from 2010 to Oct 10, 2026 (`raw/chicago/cpd_aircraft_crimes_2010_2026.csv`). "Violent" means battery, assault or sexual offenses. The denominator is passengers departing ORD + MDW, monthly, from BTS T-100, available Jan 2014–Apr 2026 (`raw/chicago/bts_t100_ord_mdw_departing_pax.csv`). Outputs: `chicago_aircraft_annual.csv`, `chicago_aircraft.png`; reproduce with `python chicago_aircraft.py`.
+
+| Year | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 (Jan–Apr) |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Violent crimes on aircraft | 10 | 20 | 23 | 21 | 23 | 32 | 10 | 19 | 21 | 20 | 24 | 10 | 6 |
+| Per 10M departing passengers | 2.2 | 4.2 | 4.7 | 4.2 | 4.5 | 6.2 | 5.2 | 5.5 | 4.9 | 4.3 | 4.9 | 2.0 | 3.9 |
+| FAA unruly reports per 10M US passengers | – | – | – | 6.4 | 10.0 | 12.5 | 27.1 | 89.7 | 28.8 | 22.1 | 21.4 | 16.7 | 17.8 |
+
+1. **No 2021 surge.** Violent crimes on aircraft in Chicago ran at 4.2–6.2 per 10M departing passengers in 2015–19, averaging 4.8. In 2021 the rate was 5.5 (95% CI 3.3–8.7), 1.2× that average. In the same year FAA reports per passenger were about 7× their 2017–19 level.
+2. **No lasting rise either.** The rate was 4.3–4.9 in 2022–24, at the pre-COVID average, and 2.0 in 2025. The yearly numbers are small (10–32 crimes), so single years move a lot; the series is flat within its noise from 2015 on.
+3. **This is the best consistent-standard measure available so far, and it shows violent misconduct on aircraft at roughly its pre-pandemic rate.** It sits closer to the federal severe-end series (about 1.0–1.3×) than to the news coverage of violent incidents (about 2.5–3× per article). That supports the view that the lasting rise in violent-incident coverage reflects more attention more than more violence.
+
+Caveats:
+- Only crimes recorded by Chicago police on aircraft at ORD/MDW count. That is about 5% of US passengers, and largely incidents on flights arriving in or departing Chicago.
+- Some in-flight assaults may be handled by the FBI or airline without a CPD report. If that diversion grew after the 2021 FBI referral program, CPD counts would understate later years.
+- The old catch-all `AIRPORT/AIRCRAFT` code (mostly narcotics and airport-wide crime) was retired after 2023 and is excluded; its violent counts were small (0–15 a year since 2010).
